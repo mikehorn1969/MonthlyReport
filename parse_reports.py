@@ -16,29 +16,60 @@ def unmerge_cells_in_range(filename):
         # Get the active sheet
         sheet = wb.active
         
-        # First check if E31 is merged
-        is_merged, target_range = is_cell_merged(sheet, "E31")
+        # First check if E33 is merged
+        is_merged, target_range = is_cell_merged(sheet, "E33")
         
         if is_merged:
-            print("Cell E31 is not merged. No action taken.")
-            return
-            
-            # Unmerge cells in the specified range
+            print(f"Cell E33 is merged. Unmerging cells in range {target_range}")
+            # Unmerge SSN range
             for merged_cell_range in list(sheet.merged_cells.ranges):
                 min_col, min_row, max_col, max_row = merged_cell_range.bounds
                 # Check if the merged cell range overlaps with our target range (D31:R42)
-                if not (max_col < 4 or min_col > 18 or max_row < 31 or min_row > 42):
+                if not (max_col < 4 or min_col > 19 or max_row < 31 or min_row > 72):
                     sheet.unmerge_cells(str(merged_cell_range))
-
-        # Save the workbook
+            
+            # Save the workbook
             wb.save(filename)
             print(f"Successfully unmerged cells in range D31:R42 in {filename}")
-
+            
         else: #is_merged
-
-            print("Cell E31 is not merged. No action taken.")
-
+            print("Cell E33 is not merged. No action taken.")
         
+        # Print contents of specific cells
+        print(f"Week Ending: {sheet['G7'].value}")
+        print(f"Service Provider: {sheet['G11'].value}")
+        print(f"Client: {sheet['G13'].value}")
+
+        print("\nService Standard updates:")
+        print("SSN|Status|Comments")
+        
+        # Only print rows where column D has a value
+        for row in range(34, 43):
+            if sheet[f'D{row}'].value:  # This will skip empty cells or cells with None value
+                print(f"{sheet[f'D{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}")
+
+        print("\nService Risks:")
+        print("Risk No|Description|Likelihood|Impact|Mitigation")
+
+        for row in range(45, 48):
+            if sheet[f'D{row}'].value:
+                print(f"{sheet[f'D{row}'].value}|{sheet[f'E{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}")
+
+        print("\nService Issues:")
+        print("Issue No|Description|Impact|Mitigation")
+
+        for row in range(50, 53):
+            if sheet[f'D{row}'].value:
+                print(f"{sheet[f'D{row}'].value}|{sheet[f'E{row}'].value}|{sheet[f'K{row}'].value}")
+
+        print("\nPlanned Activities:")
+        print(f"{sheet['D57'].value}")
+
+        print("\nClient Updates:")
+        print(f"{sheet['D67'].value}")
+
+
+
     except Exception as e:
         print(f"Error processing file: {str(e)}")
         sys.exit(1)
