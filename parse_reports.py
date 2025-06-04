@@ -27,11 +27,6 @@ def unmerge_cells_in_range(filename):
                 # Check if the merged cell range overlaps with our target range (D31:R42)
                 if not (max_col < 4 or min_col > 19 or max_row < 31 or min_row > 72):
                     sheet.unmerge_cells(str(merged_cell_range))
-            
-            # Save the workbook
-            wb.save(filename)
-            print(f"Successfully unmerged cells in range D31:R42 in {filename}")
-            
         else: #is_merged
             print("Cell E33 is not merged. No action taken.")
         
@@ -68,7 +63,9 @@ def unmerge_cells_in_range(filename):
         print("\nClient Updates:")
         print(f"{sheet['D67'].value}")
 
-
+        # Close workbook without saving changes
+        wb.close()
+        print("\nWorkbook closed without saving changes")
 
     except Exception as e:
         print(f"Error processing file: {str(e)}")
