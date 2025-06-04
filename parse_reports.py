@@ -1,4 +1,5 @@
 import sys
+import os
 from openpyxl import load_workbook
 
 def is_cell_merged(sheet, cell_coord):
@@ -8,8 +9,10 @@ def is_cell_merged(sheet, cell_coord):
             return True, merged_range
     return False, None
 
-def unmerge_cells_in_range(filename):
+def process_workbook(filename):
+    """Process a single workbook and extract information"""
     try:
+        print(f"\nProcessing file: {filename}")
         # Load the workbook
         wb = load_workbook(filename)
         
@@ -27,7 +30,7 @@ def unmerge_cells_in_range(filename):
                 # Check if the merged cell range overlaps with our target range (D31:R42)
                 if not (max_col < 4 or min_col > 19 or max_row < 31 or min_row > 72):
                     sheet.unmerge_cells(str(merged_cell_range))
-        else: #is_merged
+        else:
             print("Cell E33 is not merged. No action taken.")
         
         # Print contents of specific cells
@@ -40,7 +43,7 @@ def unmerge_cells_in_range(filename):
         
         # Only print rows where column D has a value
         for row in range(34, 43):
-            if sheet[f'D{row}'].value:  # This will skip empty cells or cells with None value
+            if sheet[f'D{row}'].value:
                 print(f"{sheet[f'D{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}")
 
         print("\nService Risks:")
@@ -65,19 +68,43 @@ def unmerge_cells_in_range(filename):
 
         # Close workbook without saving changes
         wb.close()
-        print("\nWorkbook closed without saving changes")
+        print("Workbook closed without saving changes")
+        return True
 
     except Exception as e:
-        print(f"Error processing file: {str(e)}")
-        sys.exit(1)
+        print(f"Error processing file {filename}: {str(e)}")
+        return False
+
+def process_directory(directory_path):
+    """Process all Excel files in the specified directory"""
+    # Check if directory exists
+    if not os.path.exists(directory_path):
+        print(f"Error: Directory '{directory_path}' does not exist")
+        return False
+
+    # Get list of Excel files
+    excel_files = [f for f in os.listdir(directory_path) 
+                  if f.endswith(('.xlsx', '.xlsm', '.xls')) and f.startswith('CS Flex Weekly Service Delivery Report')]
+    
+    if not excel_files:
+        print(f"No Excel files found in '{directory_path}'")
+        return False
+
+    print(f"Found {len(excel_files)} Excel files to process")
+    
+    # Process each file
+    success_count = 0
+    for excel_file in excel_files:
+        full_path = os.path.join(directory_path, excel_file)
+        if process_workbook(full_path):
+            success_count += 1
+    
+    print(f"\nProcessing complete: {success_count} out of {len(excel_files)} files processed successfully")
+    return True
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python parse_reports.py <excel_file>")
-        sys.exit(1)
-    
-    filename = sys.argv[1]
-    unmerge_cells_in_range(filename)
+    directory_path = r"C:\Users\MikeHorn\Downloads\Weekly Reports"
+    process_directory(directory_path)
 
 
 
