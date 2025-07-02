@@ -12,6 +12,8 @@ def is_cell_merged(sheet, cell_coord):
 def process_workbook(filename):
     """Process a single workbook and extract information"""
     try:
+
+        
         print(f"\nProcessing file: {filename}")
         # Load the workbook
         wb = load_workbook(filename)
@@ -33,38 +35,43 @@ def process_workbook(filename):
         else:
             print("Cell E33 is not merged. No action taken.")
         
-        # Print contents of specific cells
-        print(f"Week Ending: {sheet['G7'].value}")
-        print(f"Service Provider: {sheet['G11'].value}")
-        print(f"Client: {sheet['G13'].value}")
+        name, ext = filename.rsplit('.', 1)  # Split on last dot
+        fname = f"{name}.txt"
 
-        print("\nService Standard updates:")
-        print("SSN|Status|Comments")
-        
-        # Only print rows where column D has a value
-        for row in range(34, 43):
-            if sheet[f'D{row}'].value:
-                print(f"{sheet[f'D{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}")
+        with open(fname, 'w') as file:
+    
+            # Print contents of specific cells
+            file.write(f"Week Ending: {sheet['G7'].value}\n")
+            file.write(f"Service Provider: {sheet['G11'].value}\n")
+            file.write(f"Client: {sheet['G13'].value}\n")
 
-        print("\nService Risks:")
-        print("Risk No|Description|Likelihood|Impact|Mitigation")
+            file.write("\nService Standard updates:\n")
+            file.write("SSN|Status|Comments\n")
+            
+            # Only print rows where column D has a value
+            for row in range(34, 43):
+                if sheet[f'D{row}'].value:
+                    file.write(f"{sheet[f'D{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}\n")
 
-        for row in range(45, 48):
-            if sheet[f'D{row}'].value:
-                print(f"{sheet[f'D{row}'].value}|{sheet[f'E{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}")
+            file.write("\nService Risks:\n")
+            file.write("Risk No|Description|Likelihood|Impact|Mitigation\n")
 
-        print("\nService Issues:")
-        print("Issue No|Description|Impact|Mitigation")
+            for row in range(45, 48):
+                if sheet[f'D{row}'].value:
+                    file.write(f"{sheet[f'D{row}'].value}|{sheet[f'E{row}'].value}|{sheet[f'H{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}\n")
 
-        for row in range(50, 53):
-            if sheet[f'D{row}'].value:
-                print(f"{sheet[f'D{row}'].value}|{sheet[f'E{row}'].value}|{sheet[f'K{row}'].value}")
+            file.write("\nService Issues:\n")
+            file.write("Issue No|Description|Impact|Mitigation\n")
 
-        print("\nPlanned Activities:")
-        print(f"{sheet['D57'].value}")
+            for row in range(50, 53):
+                if sheet[f'D{row}'].value:
+                    file.write(f"{sheet[f'D{row}'].value}|{sheet[f'E{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}\n")
 
-        print("\nClient Updates:")
-        print(f"{sheet['D67'].value}")
+            file.write("\nPlanned Activities:\n")
+            file.write(f"{sheet['D57'].value}")
+
+            file.write("\nClient Updates:\n")
+            file.write(f"{sheet['D67'].value}")
 
         # Close workbook without saving changes
         wb.close()
@@ -84,7 +91,7 @@ def process_directory(directory_path):
 
     # Get list of Excel files
     excel_files = [f for f in os.listdir(directory_path) 
-                  if f.endswith(('.xlsx', '.xlsm', '.xls')) and f.startswith('CS Flex Weekly Service Delivery Report')]
+                  if f.endswith(('.xlsx', '.xlsm', '.xls'))]
     
     if not excel_files:
         print(f"No Excel files found in '{directory_path}'")
@@ -103,7 +110,7 @@ def process_directory(directory_path):
     return True
 
 if __name__ == "__main__":
-    directory_path = r"C:\Users\MikeHorn\Downloads\Weekly Reports"
+    directory_path = r"C:\Users\MikeHorn\Downloads\june 2025"
     process_directory(directory_path)
 
 
