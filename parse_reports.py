@@ -110,8 +110,13 @@ def process_directory(directory_path):
     return True
 
 if __name__ == "__main__":
-    directory_path = r"C:\Users\MikeHorn\Downloads\june 2025"
-    process_directory(directory_path)
+    arguments = sys.argv
+    if len(arguments) < 2:
+        print("Error: Usage: python parse_reports.py [dirname], where dirname contains the weekly reports") 
+        sys.exit(1)
+
+    print(f"Processing: {arguments[1]}")
+    process_directory(arguments[1])
 
 
 
