@@ -48,11 +48,12 @@ def process_workbook(filename):
             file.write("\nService Standard updates:\n")
             file.write("SSN|Status|Comments\n")
             
-            # Only print rows where column D has a value
+            # Service standards
             for row in range(34, 43):
                 if sheet[f'D{row}'].value:
                     file.write(f"{sheet[f'D{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}\n")
 
+            # Service Risks
             file.write("\nService Risks:\n")
             file.write("Risk No|Description|Likelihood|Impact|Mitigation\n")
 
@@ -60,6 +61,7 @@ def process_workbook(filename):
                 if sheet[f'D{row}'].value:
                     file.write(f"{sheet[f'D{row}'].value}|{sheet[f'E{row}'].value}|{sheet[f'H{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}\n")
 
+            #Service Issues
             file.write("\nService Issues:\n")
             file.write("Issue No|Description|Impact|Mitigation\n")
 
@@ -67,9 +69,12 @@ def process_workbook(filename):
                 if sheet[f'D{row}'].value:
                     file.write(f"{sheet[f'D{row}'].value}|{sheet[f'E{row}'].value}|{sheet[f'J{row}'].value}|{sheet[f'K{row}'].value}\n")
 
+            # Planned Activities
             file.write("\nPlanned Activities:\n")
             file.write(f"{sheet['D57'].value}")
 
+
+            # Client Updates
             file.write("\nClient Updates:\n")
             file.write(f"{sheet['D67'].value}")
 
