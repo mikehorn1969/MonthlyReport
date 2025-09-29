@@ -1,5 +1,25 @@
+"""
+Excel Report Parser
+
+This script parses Excel weekly reports and extracts information into text files.
+
+Usage from Excel (Python in Excel):
+1. Import this module: import parse_reports
+2. Process current folder: parse_reports.process_current_folder()
+3. Process specific folder: parse_reports.process_folder("C:\\path\\to\\folder")
+
+Usage from command line:
+python parse_reports.py [directory_path]
+
+Functions available for Excel:
+- process_current_folder(): Process Excel files in current working directory
+- process_folder(path): Process Excel files in specified directory
+- main(): Main function (handles both command line and Excel usage)
+"""
+
 import sys
 import os
+from pathlib import Path
 from openpyxl import load_workbook
 
 def is_cell_merged(sheet, cell_coord):
@@ -12,14 +32,26 @@ def is_cell_merged(sheet, cell_coord):
 def process_workbook(filename):
     """Process a single workbook and extract information"""
     try:
-
-        
+        # Ensure we have absolute path
+        filename = os.path.abspath(filename)
         print(f"\nProcessing file: {filename}")
+        
+        # Check if file exists
+        if not os.path.exists(filename):
+            print(f"Error: File '{filename}' does not exist")
+            return False
+            
         # Load the workbook
-        wb = load_workbook(filename)
+        wb = load_workbook(filename, data_only=True)
         
         # Get the active sheet
         sheet = wb.active
+        
+        # Validate that we have a sheet
+        if sheet is None:
+            print(f"Error: Could not access active sheet in {filename}")
+            wb.close()
+            return False
         
         # First check if E33 is merged
         is_merged, target_range = is_cell_merged(sheet, "E33")
@@ -114,14 +146,59 @@ def process_directory(directory_path):
     print(f"\nProcessing complete: {success_count} out of {len(excel_files)} files processed successfully")
     return True
 
-if __name__ == "__main__":
-    arguments = sys.argv
-    if len(arguments) < 2:
-        print("Error: Usage: python parse_reports.py [dirname], where dirname contains the weekly reports") 
-        sys.exit(1)
+def process_current_folder():
+    """Convenience function for Excel - processes Excel files in current directory"""
+    try:
+        current_dir = os.getcwd()
+        print(f"Processing Excel files in current folder: {current_dir}")
+        return process_directory(current_dir)
+    except Exception as e:
+        print(f"Error processing current folder: {str(e)}")
+        return False
 
-    print(f"Processing: {arguments[1]}")
-    process_directory(arguments[1])
+def process_folder(folder_path=None):
+    """Function to process a specific folder or current folder if none specified"""
+    try:
+        if folder_path is None:
+            folder_path = os.getcwd()
+        
+        # Convert to absolute path if relative
+        folder_path = os.path.abspath(folder_path)
+        print(f"Processing folder: {folder_path}")
+        
+        return process_directory(folder_path)
+    except Exception as e:
+        print(f"Error processing folder: {str(e)}")
+        return False
+
+def main():
+    """Main function that can be called from Excel or command line"""
+    try:
+        # Check if running from command line with arguments
+        if len(sys.argv) >= 2:
+            directory_path = sys.argv[1]
+            print(f"Processing directory from command line: {directory_path}")
+        else:
+            # Get current working directory when running from Excel
+            directory_path = os.getcwd()
+            print(f"Processing current directory: {directory_path}")
+        
+        # Process the directory
+        success = process_directory(directory_path)
+        
+        if success:
+            print("Processing completed successfully")
+        else:
+            print("Processing failed")
+            
+        return success
+        
+    except Exception as e:
+        print(f"Error in main function: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    main()
 
 
 
