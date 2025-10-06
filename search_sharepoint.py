@@ -47,6 +47,7 @@ def get_sharepoint_access_token(client_id=None, tenant_id=None):
         print(f"Authentication error: {str(e)}")
         return None
 
+
 def get_sharepoint_list_items(access_token, site_name, list_name, filter_query=None):
     """Get items from a SharePoint list using the same approach as parse_reports.py"""
     headers = {
@@ -143,7 +144,6 @@ def get_sharepoint_list_items(access_token, site_name, list_name, filter_query=N
         return []
 
 
-
 def get_list_columns(access_token, site_name, list_name):
     """Get all column names from a SharePoint list (for debugging)"""
     headers = {
@@ -176,100 +176,41 @@ def get_list_columns(access_token, site_name, list_name):
         print(f"Error getting columns: {columns_response.status_code}")
         return []
 
-if __name__ == "__main__":
-    # Main execution
-    print("SharePoint List File Finder")
-    print("=" * 40)
-    print("This script queries the 'Service Provider Uploads' SharePoint list")
-    print("to find report files using the 'path' and 'report filename' columns.\n")
-    
-    # Get authentication token once
-    print("Authenticating with SharePoint...")
-    access_token = get_sharepoint_access_token()
-    
-    if not access_token:
-        print("❌ Authentication failed. Exiting.")
-        exit(1)
-    
-    # Option to show available columns first
-    # show_columns = input("Show available columns first? (y/n): ").lower().strip()
-    
-    # if show_columns == 'y':
-    #     get_list_columns(access_token, "jjag.sharepoint.com", "Service Provider Uploads")
-    #     print("\n" + "=" * 50)
-    
-    # Search for report files
-    print("Searching for report files...")
-    
-    # Get list items
-    site_name = "jjag.sharepoint.com"
-    list_name = "Service Provider Uploads"
-    
-    print(f"Querying SharePoint list: {list_name}")
-    
-    # Get all items from the list
-    list_items = get_sharepoint_list_items(access_token, site_name, list_name)
-    
-    if not list_items:
-        print("No items found in the SharePoint list.")
-    else:
-        print(f"\nFound {len(list_items)} items in the list:")
-        print("=" * 80)
+
+def mark_file_as_processed(access_token, item_id, site_name="jjag.sharepoint.com", list_name="Service Provider Uploads"):
+    """Update a SharePoint list item to mark it as processed"""
+    try:
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
         
-        # Process and display items
-        report_files = []
+        # Get site ID first
+        site_info_url = f"https://graph.microsoft.com/v1.0/sites/{site_name}:/sites/InternalTeam:"
+        site_response = requests.get(site_info_url, headers=headers)
         
-        for item in list_items:
-            fields = item.get('fields', {})
+        if site_response.status_code != 200:
+            print(f"Failed to get site info: {site_response.status_code}")
+            return False
             
-            # Get the path and report filename columns (using correct SharePoint field names)
-            path = fields.get('Path', 'N/A')
-            filename = fields.get('Reportfilename', 'N/A')
-            
-            # Additional fields that might be useful
-            title = fields.get('Title', 'N/A')
-            created = fields.get('Created', 'N/A')
-            modified = fields.get('Modified', 'N/A')
-            
-            print(f"Title: {title}")
-            print(f"Path: {path}")
-            print(f"Report Filename: {filename}")
-            print(f"Created: {created}")
-            print(f"Modified: {modified}")
-            
-            # Filter for files that look like reports
-            if ('CS Flex Weekly Service Delivery Report' in str(filename) or 
-                'Weekly Service Delivery' in str(filename) or
-                '.xlsx' in str(filename)):
-                
-                report_files.append({
-                    'title': title,
-                    'path': path,
-                    'filename': filename,
-                    'created': created,
-                    'modified': modified,
-                    'full_url': f"{path}/{filename}" if path != 'N/A' and filename != 'N/A' else 'N/A'
-                })
-            
-            print("-" * 40)
+        site_id = site_response.json()['id']
         
-        if report_files:
-            print(f"\n🎯 Found {len(report_files)} report files:")
-            print("=" * 80)
-            
-            for i, report in enumerate(report_files, 1):
-                print(f"{i}. {report['filename']}")
-                print(f"   Path: {report['path']}")
-                print(f"   Full URL: {report['full_url']}")
-                print(f"   Modified: {report['modified']}")
-                print()
-            
-            print(f"\n✅ Successfully found {len(report_files)} report files from SharePoint list!")
+        # Update the list item
+        update_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/items/{item_id}/fields"
+        
+        update_data = {
+            "Monthlyreportprocessed": True
+        }
+        
+        response = requests.patch(update_url, headers=headers, json=update_data)
+        
+        if response.status_code in [200, 201, 204]:
+            print(f"Successfully marked item {item_id} as processed")
+            return True
         else:
-            print("\n❌ No report files found matching the criteria.")
-            print("Available field names in the list items:")
-            if list_items:
-                sample_fields = list_items[0].get('fields', {}).keys()
-                for field_name in sorted(sample_fields):
-                    print(f"  - {field_name}")
-                print("\nYou may need to adjust the field name mappings in the script.") 
+            print(f"Failed to mark item as processed: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"Error marking file as processed: {str(e)}")
+        return False
