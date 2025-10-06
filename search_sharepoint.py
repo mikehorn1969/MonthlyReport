@@ -26,7 +26,7 @@ def get_sharepoint_access_token(client_id=None, tenant_id=None):
         scopes = ["https://graph.microsoft.com/.default"]
         
         # Tech debt: Temporary workaround should be stored in Key Vault (same as parse_reports.py)
-        client_secret = "fPl8Q~oEqBx.Mi0sfTJq2PQ-teDBeaHG6M5K4cKN"
+        client_secret = CLIENT_SECRET
 
         app = msal.ConfidentialClientApplication(
             client_id=client_id,
@@ -58,48 +58,19 @@ def get_sharepoint_list_items(access_token, site_name, list_name, filter_query=N
     
     try:
         # Method 1: Try direct site access using hostname:/sites/sitename format
-        site_url = f"https://graph.microsoft.com/v1.0/sites/{site_name}:/sites/InternalTeam"
-        print(f"Trying site URL: {site_url}")
+        site_url = f"https://graph.microsoft.com/v1.0/sites/{site_name}:/sites/InternalTeam"        
         site_response = requests.get(site_url, headers=headers)
         
-        if site_response.status_code != 200:
-            print(f"Method 1 failed: {site_response.status_code}")
-            # Method 2: Try with root site access
-            site_url = f"https://graph.microsoft.com/v1.0/sites/root"
-            print(f"Trying root site URL: {site_url}")
-            site_response = requests.get(site_url, headers=headers)
-            
-            if site_response.status_code != 200:
-                print(f"Method 2 failed: {site_response.status_code}")
-                # Method 3: Try searching for the site
-                search_url = f"https://graph.microsoft.com/v1.0/sites?search=InternalTeam"
-                print(f"Trying site search: {search_url}")
-                search_response = requests.get(search_url, headers=headers)
-                
-                if search_response.status_code == 200:
-                    sites = search_response.json().get('value', [])
-                    if sites:
-                        site_id = sites[0]['id']
-                        print(f"Found site via search: {site_id}")
-                    else:
-                        print("No sites found via search")
-                        return []
-                else:
-                    print(f"Site search failed: {search_response.status_code}")
-                    print(search_response.text)
-                    return []
-            else:
-                site_id = site_response.json()['id']
-                print(f"Got root site ID: {site_id}")
+        if site_response.status_code == 200:            
+            site_id = site_response.json()['id']            
         else:
-            site_id = site_response.json()['id']
-            print(f"Got site ID: {site_id}")
+            print(f"Error getting site info: {site_response.status_code}")
+            print(site_response.text)
+            return []
         
-        # Now try to get the list
-        # Method 1: Try by list display name
+        # Now try to get the list by list display name
         list_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{urllib.parse.quote(list_name)}/items"
-        print(f"Trying list URL: {list_url}")
-        
+                
         # Add expand to get field values and filter if provided
         params = {
             'expand': 'fields'
@@ -141,39 +112,6 @@ def get_sharepoint_list_items(access_token, site_name, list_name, filter_query=N
             
     except Exception as e:
         print(f"Error getting SharePoint list items: {str(e)}")
-        return []
-
-
-def get_list_columns(access_token, site_name, list_name):
-    """Get all column names from a SharePoint list (for debugging)"""
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Accept': 'application/json'
-    }
-    
-    # Get site ID
-    site_url = f"https://graph.microsoft.com/v1.0/sites/{site_name}"
-    site_response = requests.get(site_url, headers=headers)
-    
-    if site_response.status_code != 200:
-        print(f"Error getting site info: {site_response.status_code}")
-        return []
-    
-    site_id = site_response.json()['id']
-    
-    # Get list columns
-    columns_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/columns"
-    columns_response = requests.get(columns_url, headers=headers)
-    
-    if columns_response.status_code == 200:
-        columns = columns_response.json().get('value', [])
-        print(f"\nAvailable columns in '{list_name}' list:")
-        print("=" * 50)
-        for col in columns:
-            print(f"- {col.get('name')} ({col.get('displayName')})")
-        return columns
-    else:
-        print(f"Error getting columns: {columns_response.status_code}")
         return []
 
 

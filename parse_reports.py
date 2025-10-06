@@ -1,12 +1,10 @@
 """
 Excel Report Parser with SharePoint Support
-
 This script parses Excel weekly reports and extracts information into text files.
-
 """
 
 import os
-from pathlib import Path
+#from pathlib import Path
 from openpyxl import load_workbook
 import requests
 import msal
@@ -15,11 +13,12 @@ from urllib.parse import urlparse, quote
 import tempfile
 from datetime import datetime
 from search_sharepoint import get_sharepoint_list_items, mark_file_as_processed
+from sharepoint_config import get_current_month_path, get_previous_month_path, get_specific_month_path
+
 
 # SharePoint configuration
 try:
-    from sharepoint_config import get_config, CLIENT_ID, TENANT_ID
-    SHAREPOINT_CONFIG = get_config()
+    from sharepoint_config import CLIENT_ID, TENANT_ID, CLIENT_SECRET    
 except ImportError:
     print("Error: sharepoint_config.py not found or has errors.")
     raise
@@ -55,8 +54,8 @@ def get_sharepoint_token(client_id=None, tenant_id=None, redirect_url=None):
                 return result["access_token"]
         
         # Tech debt: Temporary workaround should be stored in Key Vault
-        client_secret = "fPl8Q~oEqBx.Mi0sfTJq2PQ-teDBeaHG6M5K4cKN"
-
+        client_secret = CLIENT_SECRET
+        
         app = msal.ConfidentialClientApplication(
             client_id=client_id,
             client_credential=client_secret,
@@ -355,7 +354,7 @@ def process_sharepoint_files(client_id=None, tenant_id=None, config=None, redire
         if not access_token:
             return False
         
-        # Get SharePoint list items. wibble got here 1
+        # Get SharePoint list items. 
         print("Fetching SharePoint list items...")
         # Tech debt: site and list name should be configurable
         site_name = "jjag.sharepoint.com"
@@ -368,7 +367,7 @@ def process_sharepoint_files(client_id=None, tenant_id=None, config=None, redire
         
         print(f"Found {len(list_items)} items in SharePoint list")
         
-        # Filter for unprocessed Excel files wibble got here 2
+        # Filter for unprocessed Excel files 
         excel_files = []
         for item in list_items:
             fields = item.get('fields', {})
@@ -378,7 +377,7 @@ def process_sharepoint_files(client_id=None, tenant_id=None, config=None, redire
             filename = fields.get('Reportfilename', '')
             filename = f"{filename.strip()}.xlsx" 
             
-            # Check if monthly report processed wibble got here 3
+            # Check if monthly report processed 
             monthly_report_processed = (fields.get('Monthlyreportprocessed'))
             if monthly_report_processed is True:
                 continue  # Already processed
@@ -386,17 +385,14 @@ def process_sharepoint_files(client_id=None, tenant_id=None, config=None, redire
             manager = fields.get('manager', '')
             if manager != 'Julian Brown':
                 continue  # Not the target manager 
-            
-            # Only process Excel files that haven't been processed
-            if (filename and monthly_report_processed not in [True, 'Yes', 'true', '1', 1, 'True']):
-                
-                excel_files.append({
-                    'filename': filename,
-                    'path': path,
-                    'full_url': f"{path.rstrip('/')}/{filename}",
-                    'item_id': item.get('id', ''),
-                    'fields': fields
-                })
+                            
+            excel_files.append({
+                'filename': filename,
+                'path': path,
+                'full_url': f"{path.rstrip('/')}/{filename}",
+                'item_id': item.get('id', ''),
+                'fields': fields
+            })
         
         if not excel_files:
             print("No unprocessed Excel files found in SharePoint list")
@@ -463,7 +459,7 @@ def upload_text_to_sharepoint(access_token, file_content, filename):
         
         # Try different path approaches - focusing on the new target location
         target_paths = [
-            "/MonthlyReports/2025/09 - September"
+            f"/MonthlyReports/{get_current_month_path()}"
         ]
         
         for target_path in target_paths:

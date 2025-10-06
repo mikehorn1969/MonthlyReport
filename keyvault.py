@@ -1,27 +1,16 @@
 # Azure Key Vault access
-# NOTE: This module is maintained in the CS-DOCUMENT-GENERATOR app, do not edit elsewhere.
 
 import os
 from typing import Optional
-from azure.identity import DefaultAzureCredential, ClientSecretCredential, AzureCliCredential
+from azure.identity import AzureCliCredential
 from azure.keyvault.secrets import SecretClient
 import dotenv
+
 dotenv.load_dotenv()  # Load environment variables from .env file if present
 
 
 def get_azure_credential():
-    """Get Azure credential with fallback options"""
-    
-    # Option 1: Try Service Principal (Environment Variables)
-    client_id = os.environ.get("AZURE_CLIENT_ID")
-    client_secret = os.environ.get("AZURE_CLIENT_SECRET") 
-    tenant_id = os.environ.get("AZURE_TENANT_ID")
-    
-    if client_id and client_secret and tenant_id:
-        print("Using Service Principal authentication")
-        return ClientSecretCredential(tenant_id, client_id, client_secret)
-    
-    # Option 2: Try Azure CLI
+    """Get Azure credential using Azure CLI"""    
     try:
         credential = AzureCliCredential()
         # Test the credential
@@ -31,20 +20,6 @@ def get_azure_credential():
     except Exception:
         pass
     
-    # Option 3: Try DefaultAzureCredential (may fail)
-    try:
-        credential = DefaultAzureCredential()
-        # Test the credential
-        credential.get_token("https://vault.azure.net/.default")
-        print("Using DefaultAzureCredential authentication")
-        return credential
-    except Exception as e:
-        print(f"Azure authentication failed: {str(e)}")
-        print("\nTo fix this, choose one of these options:")
-        print("1. Install and login with Azure CLI: 'az login'")
-        print("2. Set environment variables: AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID")
-        print("3. Use Visual Studio or other Azure authentication method")
-        return None
 
 def get_kv_client() -> Optional[SecretClient]:
     """Return a SecretClient if KEY_VAULT_NAME is configured, else None."""
@@ -94,10 +69,3 @@ def get_secret(env_name: str, kv_secret_name: Optional[str] = None, default_valu
         f"Please set the '{env_name}' environment variable or configure Azure authentication."
     )
 
-def is_keyvault_available() -> bool:
-    """Check if Key Vault is configured and accessible"""
-    try:
-        client = get_kv_client()
-        return client is not None
-    except:
-        return False
