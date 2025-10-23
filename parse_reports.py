@@ -4,23 +4,21 @@ This script parses Excel weekly reports and extracts information into text files
 """
 
 import os
-#from pathlib import Path
 from openpyxl import load_workbook
 import requests
 import msal
 import io
 from urllib.parse import urlparse, quote
 import tempfile
-from datetime import datetime
 from search_sharepoint import get_sharepoint_list_items, mark_file_as_processed
-from sharepoint_config import get_current_month_path, get_previous_month_path, get_specific_month_path
-
+from sharepoint_config import get_current_month_path
+import logging
 
 # SharePoint configuration
 try:
     from sharepoint_config import CLIENT_ID, TENANT_ID, CLIENT_SECRET    
 except ImportError:
-    print("Error: sharepoint_config.py not found or has errors.")
+    logging.error('sharepoint_config.py not found or has errors.')
     raise
 
 
@@ -28,13 +26,16 @@ def get_sharepoint_token(client_id=None, tenant_id=None, redirect_url=None):
     """Get SharePoint access token using MSAL"""
     try:
         if not client_id:
-            client_id = input("Enter your Azure AD application client ID: ")
+            logging.error('No client ID provided')
+            return None
+            
         if not tenant_id:
-            tenant_id = input("Enter your Azure AD tenant ID: ")
-        
+            logging.error('No tenant ID provided')
+            return None
+
         # Default redirect URI for public client apps
         if not redirect_url:
-            print("No redirect URI provided")
+            logging.error('No redirect URI provided')
             return None
         
         # Initialize MSAL app with fixed redirect URI
@@ -50,7 +51,7 @@ def get_sharepoint_token(client_id=None, tenant_id=None, redirect_url=None):
         if accounts:
             result = app.acquire_token_silent(scopes, account=accounts[0])
             if result and "access_token" in result:
-                print("Using cached token")
+                logging.info('Using cached token')
                 return result["access_token"]
         
         # Tech debt: Temporary workaround should be stored in Key Vault
@@ -66,12 +67,12 @@ def get_sharepoint_token(client_id=None, tenant_id=None, redirect_url=None):
         
         if "access_token" in result:
 
-            print("Authentication successful!")
+            logging.info("Authentication successful!")
             return result["access_token"]
+        return None
         
-            return None
     except Exception as e:
-        print(f"Error in SharePoint authentication: {str(e)}")
+        logging.error(f'Error in SharePoint authentication: {str(e)}')
         return None
 
 
@@ -107,11 +108,11 @@ def search_sharepoint_files(access_token, config=None):
             hits = data.get('value', [{}])[0].get('hitsContainers', [{}])[0].get('hits', [])
             return hits
         else:
-            print(f"SharePoint search error: {response.status_code}")
-            print(response.text)
+            logging.error(f'SharePoint search error: {response.status_code}')
+            logging.info(response.text)
             return []
     except Exception as e:
-        print(f"Error searching SharePoint files: {str(e)}")
+        logging.error(f'Error searching SharePoint files: {str(e)}')
         return []
 
 
@@ -154,11 +155,11 @@ def download_sharepoint_file(access_token, file_url):
         if response.status_code == 200:
             return response.content
         else:
-            print(f"Error downloading file: {response.status_code}")
+            logging.error(f'Error downloading file: {response.status_code}')
             return None
             
     except Exception as e:
-        print(f"Error downloading SharePoint file: {str(e)}")
+        logging.error(f'Error downloading SharePoint file: {str(e)}')
         return None
 
 
@@ -169,9 +170,9 @@ def process_sharepoint_workbook(access_token, file_info):
         file_name = resource.get('name', 'unknown.xlsx')
         file_url = resource.get('webUrl', '')
         
-        print(f"\nProcessing SharePoint file: {file_name}")
-        print(f"URL: {file_url}")
-        
+        logging.info(f"\nProcessing SharePoint file: {file_name}")
+        logging.info(f"URL: {file_url}")
+
         # Download file content
         file_content = download_sharepoint_file(access_token, file_url)
         if not file_content:
@@ -194,7 +195,7 @@ def process_sharepoint_workbook(access_token, file_info):
                 pass
                 
     except Exception as e:
-        print(f"Error processing SharePoint workbook: {str(e)}")
+        logging.error(f'Error processing SharePoint workbook: {str(e)}')
         return False
 
 
@@ -211,7 +212,7 @@ def process_workbook_content_from_memory(file_content, original_name, access_tok
         return _process_workbook_data(wb, output_name, access_token)
         
     except Exception as e:
-        print(f"Error processing workbook from memory {original_name}: {str(e)}")
+        logging.error(f'Error processing workbook from memory {original_name}: {str(e)}')
         return False
 
 
@@ -227,7 +228,7 @@ def process_workbook_content(filename, original_name=None, access_token=None):
         return _process_workbook_data(wb, output_name, access_token)
         
     except Exception as e:
-        print(f"Error processing workbook {filename}: {str(e)}")
+        logging.error(f'Error processing workbook {filename}: {str(e)}')
         return False
 
 
@@ -239,7 +240,7 @@ def _process_workbook_data(wb, output_name, access_token=None):
         
         # Validate that we have a sheet
         if sheet is None:
-            print(f"Error: Could not access active sheet in {output_name}")
+            logging.error(f'Error: Could not access active sheet in {output_name}')
             wb.close()
             return False
         
@@ -247,7 +248,7 @@ def _process_workbook_data(wb, output_name, access_token=None):
         is_merged, target_range = is_cell_merged(sheet, "E33")
         
         if is_merged:
-            print(f"Cell E33 is merged. Unmerging cells in range {target_range}")
+            logging.info(f'Cell E33 is merged. Unmerging cells in range {target_range}')
             # Unmerge SSN range
             for merged_cell_range in list(sheet.merged_cells.ranges):
                 min_col, min_row, max_col, max_row = merged_cell_range.bounds
@@ -255,8 +256,8 @@ def _process_workbook_data(wb, output_name, access_token=None):
                 if not (max_col < 4 or min_col > 19 or max_row < 31 or min_row > 72):
                     sheet.unmerge_cells(str(merged_cell_range))
         else:
-            print("Cell E33 is not merged. No action taken.")
-        
+            logging.info('Cell E33 is not merged. No action taken.')
+
         # Create output filename
         name, ext = output_name.rsplit('.', 1) if '.' in output_name else (output_name, 'xlsx')
         fname = f"{name}.txt"
@@ -315,18 +316,19 @@ def _process_workbook_data(wb, output_name, access_token=None):
             if success:
                 return True
             else:
-                print(f"⚠️ Failed to upload to SharePoint, falling back to local save: {fname}")
+                logging.warning(f'Failed to upload to SharePoint, falling back to local save: {fname}')
                 # Fall back to local save
         
         # Save locally as fallback or when no access token provided
         with open(fname, 'w', encoding='utf-8') as file:
             file.write(file_content)
-        print(f"📄 Successfully processed Excel data and saved locally as: {fname}")
+        logging.info(f'Successfully processed Excel data and saved locally as: {fname}')
         return True
 
     except Exception as e:
-        print(f"Error processing workbook data: {str(e)}")
+        logging.error(f'Error processing workbook data: {str(e)}')
         return False
+
 
 def is_cell_merged(sheet, cell_coord):
     """Check if a specific cell is part of a merged range"""
@@ -339,7 +341,7 @@ def is_cell_merged(sheet, cell_coord):
 def process_sharepoint_files(client_id=None, tenant_id=None, config=None, redirect_url=None):
     """Process Excel files from SharePoint using list items"""
     try:
-        print("Starting SharePoint file processing using list items...")
+        logging.info('Starting SharePoint file processing using list items...')
         
         # Use config values if not provided
         if client_id is None:
@@ -355,19 +357,19 @@ def process_sharepoint_files(client_id=None, tenant_id=None, config=None, redire
             return False
         
         # Get SharePoint list items. 
-        print("Fetching SharePoint list items...")
+        logging.info('Fetching SharePoint list items...')
         # Tech debt: site and list name should be configurable
         site_name = "jjag.sharepoint.com"
         list_name = "Service Provider Uploads"
         
         list_items = get_sharepoint_list_items(access_token, site_name, list_name)
         if not list_items:
-            print("No SharePoint list items found")
+            logging.warning('No SharePoint list items found')
             return False
-        
-        print(f"Found {len(list_items)} items in SharePoint list")
-        
-        # Filter for unprocessed Excel files 
+
+        logging.info(f'Found {len(list_items)} items in SharePoint list')
+
+        # Filter for unprocessed Excel files
         excel_files = []
         for item in list_items:
             fields = item.get('fields', {})
@@ -395,47 +397,46 @@ def process_sharepoint_files(client_id=None, tenant_id=None, config=None, redire
             })
         
         if not excel_files:
-            print("No unprocessed Excel files found in SharePoint list")
+            logging.warning('No unprocessed Excel files found in SharePoint list')
             return False
-        
-        print(f"Found {len(excel_files)} unprocessed Excel files to process")
-        
+
+        logging.info(f'Found {len(excel_files)} unprocessed Excel files to process')
+
         # Process each Excel file
         success_count = 0
         for file_info in excel_files:
             try:
-                print(f"\nProcessing: {file_info['filename']}")
+                logging.info(f'Processing: {file_info["filename"]}')
                 
                 # Download file from SharePoint
                 file_content = download_sharepoint_file_from_path(access_token, file_info['path'], file_info['filename'])
                 if not file_content:
-                    print(f"Failed to download: {file_info['filename']}")
+                    logging.error(f'Failed to download: {file_info["filename"]}')
                     continue
                 
                 # Process the Excel file directly from memory
                 if process_workbook_content_from_memory(file_content, file_info['filename'], access_token):
                     success_count += 1
-                    print(f"Successfully processed: {file_info['filename']}")
+                    logging.info(f'Successfully processed: {file_info["filename"]}')
                     
                     # Mark as processed in SharePoint
                     if mark_file_as_processed(access_token, file_info['item_id']):
-                        print(f"Updated SharePoint list item - marked as processed")
+                        logging.info(f'Updated SharePoint list item - marked as processed')
                     else:
-                        print(f"Warning: Failed to update SharePoint list item status")
-                    
+                        logging.warning(f'Failed to update SharePoint list item status')
+
                 else:
-                    print(f"Failed to process Excel content: {file_info['filename']}")
-                        
+                    logging.error(f'Failed to process Excel content: {file_info["filename"]}')
+
             except Exception as e:
-                print(f"Error processing {file_info['filename']}: {str(e)}")
-        
-        print(f"\nSharePoint processing complete: {success_count} out of {len(excel_files)} files processed successfully")
+                logging.error(f'Error processing {file_info["filename"]}: {str(e)}')
+
+        logging.info(f'\nSharePoint processing complete: {success_count} out of {len(excel_files)} files processed successfully')
         return success_count > 0
         
     except Exception as e:
-        print(f"Error processing SharePoint files: {str(e)}")
+        logging.error(f'Error processing SharePoint files: {str(e)}')
         return False
-
 
 
 def upload_text_to_sharepoint(access_token, file_content, filename):
@@ -452,7 +453,7 @@ def upload_text_to_sharepoint(access_token, file_content, filename):
         site_response = requests.get(site_info_url, headers={'Authorization': f'Bearer {access_token}'})
         
         if site_response.status_code != 200:
-            print(f"Failed to get site info: {site_response.status_code} - {site_response.text}")
+            logging.error(f'Failed to get site info: {site_response.status_code} - {site_response.text}')
             return False
             
         site_id = site_response.json()['id']
@@ -479,17 +480,17 @@ def upload_text_to_sharepoint(access_token, file_content, filename):
                 upload_response = requests.put(upload_url, headers=headers, data=file_content.encode('utf-8'))
                 
                 if upload_response.status_code in [200, 201]:
-                    print(f"✅ Successfully uploaded to SharePoint: {filename} at path: {target_path}")
+                    logging.info(f"Successfully uploaded to SharePoint: {filename} at path: {target_path}")
                     return True
                 else:
-                    print(f"❌ Failed with path {target_path}: {upload_response.status_code} - {upload_response.text}")
-                    
+                    logging.error(f"Failed with path {target_path}: {upload_response.status_code} - {upload_response.text}")
+
             except Exception as path_error:
-                print(f"❌ Error with path {target_path}: {str(path_error)}")
+                logging.error(f"Error with path {target_path}: {str(path_error)}")
                 continue
                 
     except Exception as e:
-        print(f"❌ Error uploading file {filename} to SharePoint: {str(e)}")
+        logging.error(f"Error uploading file {filename} to SharePoint: {str(e)}")
         return False
 
 
@@ -531,7 +532,7 @@ def download_sharepoint_file_from_path(access_token, sharepoint_path, filename):
         site_response = requests.get(site_info_url, headers=headers)
         
         if site_response.status_code != 200:
-            print(f"Failed to get site info: {site_response.status_code}")
+            logging.error(f'Failed to get site info: {site_response.status_code} - {site_response.text}')
             return None
             
         site_id = site_response.json()['id']
@@ -549,7 +550,7 @@ def download_sharepoint_file_from_path(access_token, sharepoint_path, filename):
                 # Download the actual file content
                 download_response = requests.get(download_url)
                 if download_response.status_code == 200:
-                    print(f"Successfully downloaded: {filename}")
+                    logging.info(f'Successfully downloaded: {filename}')
                     return download_response.content
         else:
             # Fallback: search for the file
@@ -575,18 +576,12 @@ def download_sharepoint_file_from_path(access_token, sharepoint_path, filename):
                                 if download_response.status_code == 200:
                                     print(f"Successfully downloaded via search: {filename}")
                                     return download_response.content
-        
-        print(f"Failed to download file: {filename}")
+
+        logging.error(f'Failed to download file: {filename}')
         return None
         
     except Exception as e:
-        print(f"Error downloading file {filename}: {str(e)}")
+        logging.error(f'Error downloading file {filename}: {str(e)}')
         return None
-
-
-if __name__ == "__main__":
-    process_sharepoint_files()
-
-
 
 
